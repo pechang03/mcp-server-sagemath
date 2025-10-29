@@ -2,7 +2,7 @@
 
 基于 Model Context Protocol (MCP) 的本地 SageMath 工具服务器，提供 `sagemath.version` 与 `sagemath.evaluate` 两个工具；支持 STDIO 传输（默认）与 HTTP 传输（可选，含 `GET /mcp` 与 `POST /mcp`）。
 
-项目状态：早期预览（v0.0.1）。
+项目状态：早期预览（v0.0.1）。欢迎试用与反馈。
 
 ## 特性
 - 暴露本地 SageMath 能力为两项 MCP 工具：版本查询与代码执行。
@@ -11,7 +11,7 @@
 - 健壮的子进程错误处理：当 Sage 未安装或路径错误时返回结构化错误，不会导致服务崩溃。
 - 简明配置：在 `src/config.ts` 直接指定 `sagePath`，或使用环境变量 `SAGE_PATH`，或系统 `PATH`。
 
-## 环境
+## 先决条件
 - `Node.js >= 18`（推荐 20+，ESM 与顶层 `await` 支持更佳）。
 - 已安装 `SageMath`，并可获得其可执行文件绝对路径（例如 Conda 环境中的 `.../envs/<env>/bin/sage`）。
 
@@ -48,8 +48,40 @@
   - 输出字段：同上。
   - 说明：执行耗时取决于代码复杂度；简单算术通常在数秒内完成。
 
+## 使用示例（HTTP 客户端）
+```js
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 
-## 在支持 MCP 的客户端中配置
+async function main() {
+  const url = new URL(process.env.MCP_URL || 'http://localhost:3000/mcp');
+  const client = new Client({ name: 'your-mcp-client', version: '0.0.1' });
+  const transport = new StreamableHTTPClientTransport(url);
+
+  await client.connect(transport);
+
+  const tools = await client.listTools();
+  console.log('Available tools:', tools.tools.map(t => t.name));
+
+  const versionResult = await client.callTool({ name: 'sagemath.version', arguments: {} });
+  console.log('sagemath.version result:', JSON.stringify(versionResult));
+
+  const evalResult = await client.callTool({
+    name: 'sagemath.evaluate',
+    arguments: { code: 'print(2+2)', timeoutMs: 10000 },
+  });
+  console.log('sagemath.evaluate result:', JSON.stringify(evalResult));
+
+  await client.close();
+}
+
+main().catch((error) => {
+  console.error('MCP client error:', error);
+  process.exit(1);
+});
+```
+
+## 在支持 MCP 的客户端中配置（mcpServers）
 - 推荐：STDIO（默认）
   - 构建：`npm run build`
   - 配置（请替换绝对路径）：
@@ -85,8 +117,17 @@
     }
     ```
 
+## 故障排查
+- `Process error: spawn sage ENOENT`
+  - 说明：找不到 `sage` 可执行文件。请检查 `src/config.ts` 的 `config.sagePath` 是否正确；或设置 `SAGE_PATH`；或确认系统 `PATH` 中存在 `sage`。
+- `Invalid Request: Server already initialized`
+  - 说明：会话重复初始化。服务端已启用无状态模式（`sessionIdGenerator: undefined`）；如自定义传输请保持该设置以避免冲突。
+- 连接失败 / Connection refused
+  - 说明：服务未启动或端口占用。请确认在 HTTP 模式下 `npm run dev` 正在运行，并检查 `PORT` 设置。
+- STDIO 模式日志
+  - 提醒：请勿向 `stdout` 打印日志，否则会破坏 JSON-RPC 帧；如需调试请输出到 `stderr` 或使用文件日志。
 
-## 安全提示 ⚠️
+## 安全提示
 - `sagemath.evaluate` 可执行任意本地 Sage 代码。请仅在可信环境使用，谨慎对待来自不可信来源的代码。
 - 如需更严格的隔离与资源限制，建议结合容器/沙箱并扩展超时、内存与 CPU 限定。
 
@@ -106,11 +147,3 @@
 ## 致谢
 - [Model Context Protocol](https://github.com/modelcontextprotocol) 社区与 SDK。
 - [SageMath](https://www.sagemath.org/) 开源数学系统。
-
-## ToDo
-
-- 增加对 SageMath 更多功能的暴露（如符号计算、绘图等）。
-- 优化性能与资源管理（如缓存 SageMath 会话、限制并发请求等）。
-- 增加对 SageMath 错误处理的完善（如超时、内存溢出等）。
-- ......
-
