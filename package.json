@@ -1,0 +1,28 @@
+{
+  "name": "mcp-server-sagemath",
+  "version": "0.0.1",
+  "description": "MCP server exposing local SageMath tools",
+  "type": "module",
+  "private": true,
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/your-org/mcp-server-sagemath.git"
+  },
+  "scripts": {
+    "dev": "MCP_TRANSPORT=http tsx src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.20.2",
+    "express": "^4.19.2",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.11.28",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.3"
+  }
+}
