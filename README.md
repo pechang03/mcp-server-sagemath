@@ -1,116 +1,133 @@
 # MCP SageMath Server
 
-基于 Model Context Protocol (MCP) 的本地 SageMath 工具服务器，提供 `sagemath.version` 与 `sagemath.evaluate` 两个工具；支持 STDIO 传输（默认）与 HTTP 传输（可选，含 `GET /mcp` 与 `POST /mcp`）。
+基于 Model Context Protocol (MCP) 的本地 SageMath 服务端，当前提供两项工具：
 
-项目状态：早期预览（v0.0.1）。
+- `sagemath.version`：查询本地 SageMath 版本。
+- `sagemath.evaluate`：执行 SageMath 脚本并返回标准输出/错误。
 
-## 特性
-- 暴露本地 SageMath 能力为两项 MCP 工具：版本查询与代码执行。
-- 传输双模：默认 STDIO；设置环境变量切换到 HTTP（`MCP_TRANSPORT=http`）。
-- 无状态会话（避免“Server already initialized”重复初始化错误）。
-- 健壮的子进程错误处理：当 Sage 未安装或路径错误时返回结构化错误，不会导致服务崩溃。
-- 简明配置：在 `src/config.ts` 直接指定 `sagePath`，或使用环境变量 `SAGE_PATH`，或系统 `PATH`。
+项目处于早期预览阶段（v0.0.1）。
 
-## 环境
-- `Node.js >= 18`（推荐 20+，ESM 与顶层 `await` 支持更佳）。
-- 已安装 `SageMath`，并可获得其可执行文件绝对路径（例如 Conda 环境中的 `.../envs/<env>/bin/sage`）。
+## 功能概览
+- **双传输模式**：默认 STDIO，可通过环境变量切换到 HTTP（同时支持 `GET /mcp` 与 `POST /mcp`）。
+- **无状态 HTTP 会话**：避免重复初始化导致的错误。
+- **可靠的子进程封装**：当 SageMath 不可用时返回结构化错误，不会崩溃。
+- **可配置的 SageMath 路径**：支持源代码配置与环境变量覆盖，默认回退到系统 PATH。
 
+## 环境要求
+- Node.js 18 及以上版本（推荐 20+）。
+- 本地已安装 SageMath，并能够通过命令行访问其可执行文件。
+
+
+## 配置 SageMath 路径
+项目在运行时按照以下优先级查找 SageMath 可执行文件：
+
+1. `src/config.ts` 中的 `config.sagePath`（若设置为非空字符串）。
+2. 环境变量 `SAGE_PATH`。
+3. 系统 PATH 中的 `sage` 命令。
+
+默认情况下，`config.sagePath` 会读取 `SAGE_PATH` 环境变量的值；如需固定路径，可在该文件内显式填写，例如：
+
+```ts
+export const config = {
+  sagePath: "/opt/sage/bin/sage",
+};
+```
 ## 安装
-- 在项目根目录执行：`npm install`
 
-## 配置
-- 文件：`src/config.ts`
-  - `config.sagePath`：若设置为非空字符串则优先使用；空值则回退到环境变量 `SAGE_PATH`；若仍为空则使用系统 `PATH` 中的 `sage`。
-- 环境变量：
-  - `SAGE_PATH`：可覆盖 `config.sagePath`。
-  - `MCP_TRANSPORT`：设置为 `http` 时启用 HTTP 模式；未设置或其他值为 STDIO（默认）。
-  - `PORT`：HTTP 模式端口，默认 `3000`。
-
-## 快速开始
-- HTTP（开发调试，含 SSE 与 JSON-RPC）：
-  - 启动：`npm run dev`（等价于 `MCP_TRANSPORT=http tsx src/index.ts`）
-  - 访问：`http://localhost:3000/mcp`
-  - 测试：`npx -y tsx src/test/client.ts`（可通过 `MCP_URL` 指定地址）
-- STDIO（默认模式，适配多数 MCP 客户端的 `command` 启动）：
-  - 直接运行示例：`npx -y tsx src/test/stdio-client.ts`
-
-## HTTP 端点（HTTP 模式）
-- `GET /mcp`：SSE/流式 JSON-RPC（适配要求 GET 的客户端）。
-- `POST /mcp`：JSON-RPC over HTTP（在请求体中携带 JSON-RPC 数据）。
-
-## MCP 工具
-- `sagemath.version`
-  - 描述：返回本地 SageMath 版本信息。
-  - 输出字段：`stdout`, `stderr`, `exitCode`, `durationMs`, `timedOut`。
-- `sagemath.evaluate`
-  - 输入：`code`（字符串），`timeoutMs`（可选，正整数毫秒，默认 10000）。
-  - 描述：在本地执行 Sage 代码（写入临时文件后运行）。
-  - 输出字段：同上。
-  - 说明：执行耗时取决于代码复杂度；简单算术通常在数秒内完成。
+- 本项目根目录下执行
+```bash
+npm install
+```
 
 
-## 在支持 MCP 的客户端中配置
-- 推荐：STDIO（默认）
-  - 构建：`npm run build`
-  - 配置（请替换绝对路径）：
-    ```jsonc
-    {
-      "mcpServers": {
-        "sagemath-server": {
-          "command": "node",
-          "args": ["/absolute/path/to/mcp-server-sagemath/dist/index.js"],
-          "disabled": false,
-          "autoApprove": ["sagemath.version", "sagemath.evaluate"],
-          "env": {
-            // "SAGE_PATH": "/absolute/path/to/sage" // 可选，若未在 src/config.ts 设置
-          }
-        }
-      }
-    }
-    ```
-- 可选：HTTP（需要显式启用）
-  - 开发：`npm run dev`（HTTP 模式）
-  - 构建后运行：`MCP_TRANSPORT=http PORT=3000 node dist/index.js`
-  - 客户端配置示例：
-    ```jsonc
-    {
-      "mcpServers": {
-        "sagemath-server-http": {
-          "command": "node",
-          "args": ["/absolute/path/to/mcp-server-sagemath/dist/index.js"],
-          "env": { "MCP_TRANSPORT": "http", "PORT": "3000" },
-          "disabled": false
-        }
-      }
-    }
-    ```
+## 运行方式
 
-
-## 安全提示 ⚠️
-- `sagemath.evaluate` 可执行任意本地 Sage 代码。请仅在可信环境使用，谨慎对待来自不可信来源的代码。
-- 如需更严格的隔离与资源限制，建议结合容器/沙箱并扩展超时、内存与 CPU 限定。
-
-## 开发与构建
-- 开发（HTTP）：`npm run dev`
+### STDIO（默认模式）
 - 构建：`npm run build`
-- 运行（STDIO，默认）：`node dist/index.js`
-- 运行（HTTP，需显式设置）：`MCP_TRANSPORT=http PORT=3000 node dist/index.js`
+- 运行：`node dist/index.js`
+- 测试示例客户端：
+  ```bash
+  npx -y tsx src/test/stdio-client.ts
+  ```
 
-## 相关文档
-- 传输模式背景与改动记录：`docs/mcp-transport-fix.md`
-- MCP SDK 与协议参考：https://github.com/modelcontextprotocol
+### HTTP 模式（需手动启用）
+- 启动开发服务器：
+  ```bash
+  MCP_TRANSPORT=http npm run dev
+  ```
+- 默认监听 `http://localhost:3000/mcp`，可通过 `PORT` 环境变量调整端口。
+- 开箱测试：
+  ```bash
+  MCP_TRANSPORT=http npx -y tsx src/test/client.ts
+  ```
+- 端点说明：
+  - `GET /mcp`：用于 SSE/流式 JSON-RPC。
+  - `POST /mcp`：标准 JSON-RPC over HTTP。
+
+## MCP 客户端配置示例
+
+### STDIO
+```jsonc
+{
+  "mcpServers": {
+    "sagemath-server": {
+      "command": "node",
+      "args": ["/absolute/path/to/mcp-server-sagemath/dist/index.js"],
+      "autoApprove": ["sagemath.version", "sagemath.evaluate"],
+      "env": {
+        // "SAGE_PATH": "/absolute/path/to/sage" // 可选
+      }
+    }
+  }
+}
+```
+
+### HTTP
+```jsonc
+{
+  "mcpServers": {
+    "sagemath-server-http": {
+      "command": "node",
+      "args": ["/absolute/path/to/mcp-server-sagemath/dist/index.js"],
+      "env": {
+        "MCP_TRANSPORT": "http",
+        "PORT": "3000"
+      }
+    }
+  }
+}
+```
+
+## 提供的工具
+
+### `sagemath.version`
+- 输出字段：`stdout`, `stderr`, `exitCode`, `durationMs`, `timedOut`。
+- 适用于检测 SageMath 是否安装及版本信息。
+
+### `sagemath.evaluate`
+- 输入：
+  - `code` (string) — 必填，SageMath 脚本。
+  - `timeoutMs` (number) — 可选，超时时间，默认 10000 ms。
+- 输出同上。
+- 执行流程：将代码写入临时文件后调用 SageMath 执行。
+
+## 测试
+- STDIO 回归测试：`npx -y tsx src/test/stdio-client.ts`
+- HTTP 回归测试：`MCP_TRANSPORT=http npx -y tsx src/test/client.ts`
+
+## 安全提示
+- `sagemath.evaluate` 可运行任意 SageMath 代码，请仅在可信环境使用。
+- 建议在需要时结合容器或沙箱进一步隔离，并设置资源配额。
+
+## Roadmap
+- 扩展更多 SageMath 功能（绘图、符号计算等）。
+- 优化长时间任务的会话复用与资源管理。
+- 增强错误分类与限流策略。
 
 ## 许可证
-- MIT，详见 `LICENSE`。
+MIT License，详见 `LICENSE`。
 
-## 致谢
-- [Model Context Protocol](https://github.com/modelcontextprotocol) 社区与 SDK。
+## 鸣谢
+- [Model Context Protocol](https://github.com/modelcontextprotocol) 社区及 SDK。
 - [SageMath](https://www.sagemath.org/) 开源数学系统。
-
-## ToDo
-
-- 增加对 SageMath 更多功能的暴露（如符号计算、绘图等）。
-- 优化性能与资源管理（如缓存 SageMath 会话、限制并发请求等）。
-- 增加对 SageMath 错误处理的完善（如超时、内存溢出等）。
-- ......
 

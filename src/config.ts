@@ -1,5 +1,10 @@
+/**
+ * 项目配置。默认从环境变量 `SAGE_PATH` 读取 Sage 可执行文件路径；
+ * 未设置时会退回到系统 PATH 中的 `sage`。
+ */
+const envSagePath = process.env.SAGE_PATH?.trim();
+
 export const config = {
-  // 在此填写 Sage 可执行文件的绝对路径；留空则回退到环境变量或系统 PATH
-  // 例如："/Users/halois/miniconda3/envs/sage106/bin/sage"
-  sagePath: "/Users/halois/miniconda3/envs/sage106/bin/sage",
+  // 如果需要固定路径，可在此手动填写，例如："/opt/sage/bin/sage"
+  sagePath: envSagePath && envSagePath.length > 0 ? envSagePath : undefined,
 };
