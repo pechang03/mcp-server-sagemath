@@ -1,7 +1,7 @@
 {
   "name": "mcp-server-sagemath",
-  "version": "0.0.1",
-  "description": "MCP server exposing local SageMath tools",
+  "version": "0.1.0",
+  "description": "MCP server exposing comprehensive SageMath mathematical tools",
   "type": "module",
   "private": true,
   "license": "MIT",

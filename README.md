@@ -1,133 +1,217 @@
 # MCP SageMath Server
 
-基于 Model Context Protocol (MCP) 的本地 SageMath 服务端，当前提供两项工具：
+A Model Context Protocol (MCP) server that provides comprehensive SageMath mathematical computation capabilities to AI assistants.
 
-- `sagemath.version`：查询本地 SageMath 版本。
-- `sagemath.evaluate`：执行 SageMath 脚本并返回标准输出/错误。
+**Version**: 0.1.0  
+**License**: MIT
 
-项目处于早期预览阶段（v0.0.1）。
+## Features
 
-## 功能概览
-- **双传输模式**：默认 STDIO，可通过环境变量切换到 HTTP（同时支持 `GET /mcp` 与 `POST /mcp`）。
-- **无状态 HTTP 会话**：避免重复初始化导致的错误。
-- **可靠的子进程封装**：当 SageMath 不可用时返回结构化错误，不会崩溃。
-- **可配置的 SageMath 路径**：支持源代码配置与环境变量覆盖，默认回退到系统 PATH。
+### 🧮 Mathematical Tools
+- **sagemath.version** - Query SageMath version
+- **sagemath.evaluate** - Execute arbitrary SageMath code
+- **sagemath.factor** - Factor integers and polynomials
+- **sagemath.solve** - Solve equations symbolically
+- **sagemath.graph_properties** - Compute graph theory properties
+- **sagemath.simplify** - Simplify mathematical expressions
+- **sagemath.integrate** - Symbolic integration (definite/indefinite)
+- **sagemath.differentiate** - Symbolic differentiation
 
-## 环境要求
-- Node.js 18 及以上版本（推荐 20+）。
-- 本地已安装 SageMath，并能够通过命令行访问其可执行文件。
+### 🚀 Server Features
+- **Dual Transport Modes**: STDIO (default) and HTTP
+- **Stateless HTTP Sessions**: No initialization errors from repeated connects
+- **Robust Error Handling**: Structured errors, never crashes
+- **Configurable Paths**: Source config, environment variable, or system PATH
+- **Timeout Protection**: All operations have configurable timeouts
+- **Clean Temporary Files**: Automatic cleanup after execution
 
+## Requirements
 
-## 配置 SageMath 路径
-项目在运行时按照以下优先级查找 SageMath 可执行文件：
+- **Node.js** 18+ (20+ recommended)
+- **SageMath** installed and accessible via command line
 
-1. `src/config.ts` 中的 `config.sagePath`（若设置为非空字符串）。
-2. 环境变量 `SAGE_PATH`。
-3. 系统 PATH 中的 `sage` 命令。
+## Installation
 
-默认情况下，`config.sagePath` 会读取 `SAGE_PATH` 环境变量的值；如需固定路径，可在该文件内显式填写，例如：
+```bash
+cd mcp-servers/mcp-server-sagemath
+npm install
+npm run build
+```
 
-```ts
+## Configuration
+
+The server locates SageMath in this priority order:
+
+1. `src/config.ts` → `config.sagePath` (if set)
+2. Environment variable `SAGE_PATH`
+3. System PATH (`sage` command)
+
+### Setting Custom Path
+
+**Via Environment Variable:**
+```bash
+export SAGE_PATH="/Applications/SageMath-10-7.app/Contents/Frameworks/Sage.framework/Versions/10.7/local/bin/sage"
+```
+
+**Via config.ts:**
+```typescript
 export const config = {
-  sagePath: "/opt/sage/bin/sage",
+  sagePath: "/path/to/sage",
 };
 ```
-## 安装
 
-- 本项目根目录下执行
+## Usage
+
+### STDIO Mode (Default)
+
+**Run the server:**
 ```bash
-npm install
+node dist/index.js
 ```
 
-
-## 运行方式
-
-### STDIO（默认模式）
-- 构建：`npm run build`
-- 运行：`node dist/index.js`
-- 测试示例客户端：
-  ```bash
-  npx -y tsx src/test/stdio-client.ts
-  ```
-
-### HTTP 模式（需手动启用）
-- 启动开发服务器：
-  ```bash
-  MCP_TRANSPORT=http npm run dev
-  ```
-- 默认监听 `http://localhost:3000/mcp`，可通过 `PORT` 环境变量调整端口。
-- 开箱测试：
-  ```bash
-  MCP_TRANSPORT=http npx -y tsx src/test/client.ts
-  ```
-- 端点说明：
-  - `GET /mcp`：用于 SSE/流式 JSON-RPC。
-  - `POST /mcp`：标准 JSON-RPC over HTTP。
-
-## MCP 客户端配置示例
-
-### STDIO
-```jsonc
+**MCP Client Configuration (Warp, Claude Desktop, etc.):**
+```json
 {
   "mcpServers": {
-    "sagemath-server": {
+    "sagemath": {
       "command": "node",
       "args": ["/absolute/path/to/mcp-server-sagemath/dist/index.js"],
-      "autoApprove": ["sagemath.version", "sagemath.evaluate"],
       "env": {
-        // "SAGE_PATH": "/absolute/path/to/sage" // 可选
+        "SAGE_PATH": "/path/to/sage"
       }
     }
   }
 }
 ```
 
-### HTTP
-```jsonc
+### HTTP Mode
+
+**Start server:**
+```bash
+MCP_TRANSPORT=http npm run dev
+```
+
+**Access at:** `http://localhost:3000/mcp`
+
+**Change port:**
+```bash
+PORT=8080 MCP_TRANSPORT=http npm run dev
+```
+
+**Endpoints:**
+- `GET /mcp` - Server-Sent Events / Streaming JSON-RPC
+- `POST /mcp` - Standard JSON-RPC over HTTP
+
+## Available Tools
+
+### 1. sagemath.version
+Get SageMath version information.
+
+**Parameters:** None
+
+### 2. sagemath.evaluate
+Execute arbitrary SageMath code.
+
+**Parameters:**
+- `code` (string, required) - SageMath code to execute
+- `timeoutMs` (number, optional) - Timeout in milliseconds (default: 10000)
+
+### 3. sagemath.factor
+Factor an integer or polynomial.
+
+**Parameters:**
+- `input` (string | number, required) - Number or expression to factor
+- `timeoutMs` (number, optional) - Timeout (default: 10000ms)
+
+**Output:**
+```json
 {
-  "mcpServers": {
-    "sagemath-server-http": {
-      "command": "node",
-      "args": ["/absolute/path/to/mcp-server-sagemath/dist/index.js"],
-      "env": {
-        "MCP_TRANSPORT": "http",
-        "PORT": "3000"
-      }
-    }
-  }
+  "success": true,
+  "result": "3^2 * 3607 * 3803"
 }
 ```
 
-## 提供的工具
+### 4. sagemath.solve
+Solve equations symbolically.
 
-### `sagemath.version`
-- 输出字段：`stdout`, `stderr`, `exitCode`, `durationMs`, `timedOut`。
-- 适用于检测 SageMath 是否安装及版本信息。
+**Parameters:**
+- `equation` (string, required) - Equation to solve (e.g., "x^2 + 2*x + 1 = 0")
+- `variable` (string, optional) - Variable to solve for (default: "x")
+- `timeoutMs` (number, optional) - Timeout (default: 15000ms)
 
-### `sagemath.evaluate`
-- 输入：
-  - `code` (string) — 必填，SageMath 脚本。
-  - `timeoutMs` (number) — 可选，超时时间，默认 10000 ms。
-- 输出同上。
-- 执行流程：将代码写入临时文件后调用 SageMath 执行。
+### 5. sagemath.graph_properties
+Compute graph theory properties.
 
-## 测试
-- STDIO 回归测试：`npx -y tsx src/test/stdio-client.ts`
-- HTTP 回归测试：`MCP_TRANSPORT=http npx -y tsx src/test/client.ts`
+**Parameters:**
+- `edges` (array, required) - List of edges as `[u, v]` pairs
+- `vertices` (array, optional) - List of vertices
+- `properties` (string[], required) - Properties to compute
+- `timeoutMs` (number, optional) - Timeout (default: 20000ms)
 
-## 安全提示
-- `sagemath.evaluate` 可运行任意 SageMath 代码，请仅在可信环境使用。
-- 建议在需要时结合容器或沙箱进一步隔离，并设置资源配额。
+**Available Properties:**
+- `chromatic_number`, `clique_number`, `independence_number`
+- `diameter`, `girth`, `vertex_connectivity`, `edge_connectivity`
+- `num_vertices`, `num_edges`
+- `is_connected`, `is_planar`, `is_bipartite`
 
-## Roadmap
-- 扩展更多 SageMath 功能（绘图、符号计算等）。
-- 优化长时间任务的会话复用与资源管理。
-- 增强错误分类与限流策略。
+### 6. sagemath.simplify
+Simplify a mathematical expression.
 
-## 许可证
-MIT License，详见 `LICENSE`。
+### 7. sagemath.integrate
+Compute symbolic integration (definite or indefinite).
 
-## 鸣谢
-- [Model Context Protocol](https://github.com/modelcontextprotocol) 社区及 SDK。
-- [SageMath](https://www.sagemath.org/) 开源数学系统。
+### 8. sagemath.differentiate
+Compute symbolic differentiation (with configurable order).
 
+## AI Assistant Usage Examples
+
+**Factor a large number:**
+> "Use SageMath to factor 2^67 - 1"
+
+**Solve a quadratic:**
+> "Solve x^2 + 5x + 6 = 0 using SageMath"
+
+**Graph properties:**
+> "Calculate the chromatic number of the Petersen graph"
+
+**Integration:**
+> "Integrate x^2 * sin(x) with respect to x"
+
+## Security Considerations
+
+⚠️ **Important**: `sagemath.evaluate` can execute arbitrary SageMath code. Use only in trusted environments.
+
+**Recommendations:**
+- Deploy behind authentication
+- Use containerization (Docker, etc.)
+- Set resource limits
+- Implement rate limiting
+
+## Troubleshooting
+
+### SageMath not found
+```bash
+# Check if sage is in PATH
+which sage
+
+# Set SAGE_PATH explicitly
+export SAGE_PATH="/path/to/sage"
+
+# Verify it works
+sage --version
+```
+
+### Server not connecting in Warp
+1. Restart Warp completely
+2. Verify config: `cat ~/.config/warp/warp_mcp_config.json`
+3. Check server builds: `npm run build`
+
+## Acknowledgments
+
+- [Model Context Protocol](https://modelcontextprotocol.io/)
+- [SageMath](https://www.sagemath.org/)
+- Original by [GaloisHLee](https://github.com/GaloisHLee/mcp-server-sagemath)
+
+## License
+
+MIT License

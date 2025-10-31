@@ -5,10 +5,18 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { evaluateSage, getSageVersion } from './tools/sagemath.js';
+import { 
+  factorNumber, 
+  solveEquation, 
+  graphProperties,
+  simplifyExpression,
+  integrateExpression,
+  differentiateExpression
+} from './tools/specialized.js';
 
 const server = new McpServer({
   name: 'mcp-server-sagemath',
-  version: '0.0.1',
+  version: '0.1.0',
 });
 
 server.registerTool(
@@ -54,6 +62,183 @@ server.registerTool(
   },
   async ({ code, timeoutMs }) => {
     const result = await evaluateSage(code, timeoutMs ?? 10000);
+    const structured = result as unknown as Record<string, unknown>;
+    return {
+      content: [{ type: 'text', text: JSON.stringify(structured) }],
+      structuredContent: structured,
+    };
+  }
+);
+
+// Factor numbers or polynomials
+server.registerTool(
+  'sagemath.factor',
+  {
+    title: 'Factor Number',
+    description: 'Factor an integer or polynomial using SageMath',
+    inputSchema: {
+      input: z.union([z.string(), z.number()]).describe('Number or expression to factor'),
+      timeoutMs: z.number().int().positive().optional(),
+    },
+    outputSchema: {
+      stdout: z.string(),
+      stderr: z.string(),
+      exitCode: z.number().nullable(),
+      durationMs: z.number(),
+      timedOut: z.boolean(),
+    },
+  },
+  async ({ input, timeoutMs }) => {
+    const result = await factorNumber(input, timeoutMs ?? 10000);
+    const structured = result as unknown as Record<string, unknown>;
+    return {
+      content: [{ type: 'text', text: JSON.stringify(structured) }],
+      structuredContent: structured,
+    };
+  }
+);
+
+// Solve equations
+server.registerTool(
+  'sagemath.solve',
+  {
+    title: 'Solve Equation',
+    description: 'Solve an equation symbolically',
+    inputSchema: {
+      equation: z.string().describe('Equation to solve (e.g., "x^2 + 2*x + 1 = 0")'),
+      variable: z.string().optional().default('x').describe('Variable to solve for'),
+      timeoutMs: z.number().int().positive().optional(),
+    },
+    outputSchema: {
+      stdout: z.string(),
+      stderr: z.string(),
+      exitCode: z.number().nullable(),
+      durationMs: z.number(),
+      timedOut: z.boolean(),
+    },
+  },
+  async ({ equation, variable, timeoutMs }) => {
+    const result = await solveEquation(equation, variable ?? 'x', timeoutMs ?? 15000);
+    const structured = result as unknown as Record<string, unknown>;
+    return {
+      content: [{ type: 'text', text: JSON.stringify(structured) }],
+      structuredContent: structured,
+    };
+  }
+);
+
+// Graph properties
+server.registerTool(
+  'sagemath.graph_properties',
+  {
+    title: 'Graph Properties',
+    description: 'Compute graph theory properties (chromatic number, clique number, etc.)',
+    inputSchema: {
+      vertices: z.array(z.any()).optional().describe('List of vertices'),
+      edges: z.array(z.tuple([z.any(), z.any()])).describe('List of edges as [u, v] pairs'),
+      properties: z.array(z.string()).describe('Properties to compute (e.g., chromatic_number, clique_number, diameter)'),
+      timeoutMs: z.number().int().positive().optional(),
+    },
+    outputSchema: {
+      stdout: z.string(),
+      stderr: z.string(),
+      exitCode: z.number().nullable(),
+      durationMs: z.number(),
+      timedOut: z.boolean(),
+    },
+  },
+  async ({ vertices, edges, properties, timeoutMs }) => {
+    const result = await graphProperties({ vertices, edges }, properties, timeoutMs ?? 20000);
+    const structured = result as unknown as Record<string, unknown>;
+    return {
+      content: [{ type: 'text', text: JSON.stringify(structured) }],
+      structuredContent: structured,
+    };
+  }
+);
+
+// Simplify expressions
+server.registerTool(
+  'sagemath.simplify',
+  {
+    title: 'Simplify Expression',
+    description: 'Simplify a mathematical expression',
+    inputSchema: {
+      expression: z.string().describe('Expression to simplify'),
+      timeoutMs: z.number().int().positive().optional(),
+    },
+    outputSchema: {
+      stdout: z.string(),
+      stderr: z.string(),
+      exitCode: z.number().nullable(),
+      durationMs: z.number(),
+      timedOut: z.boolean(),
+    },
+  },
+  async ({ expression, timeoutMs }) => {
+    const result = await simplifyExpression(expression, timeoutMs ?? 10000);
+    const structured = result as unknown as Record<string, unknown>;
+    return {
+      content: [{ type: 'text', text: JSON.stringify(structured) }],
+      structuredContent: structured,
+    };
+  }
+);
+
+// Integration
+server.registerTool(
+  'sagemath.integrate',
+  {
+    title: 'Integrate Expression',
+    description: 'Compute symbolic integration (definite or indefinite)',
+    inputSchema: {
+      expression: z.string().describe('Expression to integrate'),
+      variable: z.string().describe('Variable to integrate with respect to'),
+      lower: z.string().optional().describe('Lower limit (for definite integral)'),
+      upper: z.string().optional().describe('Upper limit (for definite integral)'),
+      timeoutMs: z.number().int().positive().optional(),
+    },
+    outputSchema: {
+      stdout: z.string(),
+      stderr: z.string(),
+      exitCode: z.number().nullable(),
+      durationMs: z.number(),
+      timedOut: z.boolean(),
+    },
+  },
+  async ({ expression, variable, lower, upper, timeoutMs }) => {
+    const limits = (lower && upper) ? { lower, upper } : undefined;
+    const result = await integrateExpression(expression, variable, limits, timeoutMs ?? 15000);
+    const structured = result as unknown as Record<string, unknown>;
+    return {
+      content: [{ type: 'text', text: JSON.stringify(structured) }],
+      structuredContent: structured,
+    };
+  }
+);
+
+// Differentiation
+server.registerTool(
+  'sagemath.differentiate',
+  {
+    title: 'Differentiate Expression',
+    description: 'Compute symbolic differentiation',
+    inputSchema: {
+      expression: z.string().describe('Expression to differentiate'),
+      variable: z.string().describe('Variable to differentiate with respect to'),
+      order: z.number().int().positive().optional().default(1).describe('Order of differentiation'),
+      timeoutMs: z.number().int().positive().optional(),
+    },
+    outputSchema: {
+      stdout: z.string(),
+      stderr: z.string(),
+      exitCode: z.number().nullable(),
+      durationMs: z.number(),
+      timedOut: z.boolean(),
+    },
+  },
+  async ({ expression, variable, order, timeoutMs }) => {
+    const result = await differentiateExpression(expression, variable, order ?? 1, timeoutMs ?? 10000);
     const structured = result as unknown as Record<string, unknown>;
     return {
       content: [{ type: 'text', text: JSON.stringify(structured) }],

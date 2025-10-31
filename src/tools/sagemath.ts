@@ -13,7 +13,7 @@ export interface SageRunResult {
 }
 
 function getSageExecutable(): string {
-  return (config.SagePath?.trim()) || (process.env.SAGE_PATH?.trim()) || 'sage';
+  return (config.sagePath?.trim()) || (process.env.SAGE_PATH?.trim()) || 'sage';
 }
 
 async function runProcess(cmd: string, args: string[], timeoutMs: number): Promise<SageRunResult> {
